@@ -10,8 +10,6 @@ import '@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol';
 import '@openzeppelin/contracts-upgradeable/token/ERC721/IERC721ReceiverUpgradeable.sol';
 import '@openzeppelin/contracts/utils/structs/EnumerableSet.sol';
 
-using EnumerableSet for EnumerableSet.UintSet;
-
 
 /** 
  _________  ________  _______   ________  ________  ___  ___  ________  _______      
@@ -35,7 +33,7 @@ using EnumerableSet for EnumerableSet.UintSet;
     @author magiclars <https://github.com/magiclars-off>
 */
 contract ArcadeStaking is Initializable, OwnableUpgradeable, PausableUpgradeable, IERC721ReceiverUpgradeable {
-
+    using EnumerableSet for EnumerableSet.UintSet;
 
     /**********************
      * Contract Variables *

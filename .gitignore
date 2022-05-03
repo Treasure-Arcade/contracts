@@ -1,6 +1,8 @@
 artifacts/
 cache/
+coverage/
 node_modules/
 .env
 .openzeppelin
 .artifacts
+/coverage.json

@@ -73,8 +73,8 @@ contract ArcadePass1155 is ERC1155, Ownable, Pausable {
     }
 
     /// Verify that address did not mint MAX_MINT_COUNT
-    modifier hasNotMaxMinted() {
-        require(numberMinted[msg.sender] < MAX_MINT_COUNT, 'Not Eligible to Mint');
+    modifier hasNotMintedMax(uint256 _quantity) {
+        require((numberMinted[msg.sender] + _quantity) <= MAX_MINT_COUNT, 'Exceeds allowance');
         _;
     }
     
@@ -116,34 +116,31 @@ contract ArcadePass1155 is ERC1155, Ownable, Pausable {
     }
 
     /// publicMint allows the sender to mint 1 Arcade Pass
-    function publicMint() external payable
+    function publicMint(uint256 _quantity) external payable
         saleStarted(publicMintStartTime)
         supplyAvailable
-        hasNotMaxMinted
+        hasNotMintedMax(_quantity)
         correctPrice
     {
-        numberMinted[msg.sender]++;
-        _tokenIds++;
+        (uint256[] memory newIDs, uint256[] memory newAmounts) = getNewTokenIds(_quantity);
 
-        _mint(msg.sender, _tokenIds, 1, "");
+        _mintBatch(msg.sender, newIDs, newAmounts, "");
     }
 
     /// allowlistMint allows the sender to mint 1 Arcade Pass if allowlisted
-    function allowlistMint(bytes32[] calldata _merkleProof) external payable
+    function allowlistMint(bytes32[] calldata _merkleProof, uint256 _quantity) external payable
         saleStarted(allowlistMintStartTime) 
         supplyAvailable
-        hasNotMaxMinted
+        hasNotMintedMax(_quantity)
         correctPrice
     {
-
         /// Verify that address is on the allowlist
         bytes32 leaf = keccak256(abi.encodePacked(msg.sender));
         require(MerkleProof.verify(_merkleProof, merkleRoot, leaf), 'Invalid Proof');
 
-        numberMinted[msg.sender]++;
-        _tokenIds++;
+        (uint256[] memory newIDs, uint256[] memory newAmounts) = getNewTokenIds(_quantity);
 
-        _mint(msg.sender, _tokenIds, 1, "");
+        _mintBatch(msg.sender, newIDs, newAmounts, "");
     }
 
     /// teamMint allows the teamAddress to mint the TEAM_MINT_COUNT
@@ -155,21 +152,28 @@ contract ArcadePass1155 is ERC1155, Ownable, Pausable {
         require(!teamHasMinted, 'Team Already Minted');
 
         teamHasMinted = true;
+        (uint256[] memory newIDs, uint256[] memory newAmounts) = getNewTokenIds(TEAM_MINT_COUNT);
+        
+        _mintBatch(msg.sender, newIDs, newAmounts, "");
+    }
 
-        uint256[] memory newIDs = new uint256[](TEAM_MINT_COUNT);
-        uint256[] memory newAmounts = new uint256[](TEAM_MINT_COUNT);
+    /// getNewTokenIds returns a newIDs and newAmounts array based on _quantity
+    function getNewTokenIds(uint256 _quantity) internal returns(uint256[] memory, uint256[] memory) {
+        uint256[] memory newIDs = new uint256[](_quantity);
+        uint256[] memory newAmounts = new uint256[](_quantity);
 
         uint256 _internalTokenID = _tokenIds;
 
-        for (uint256 i = 0; i < TEAM_MINT_COUNT; i++) {
+        for (uint256 i = 0; i < _quantity; i++) {
             _internalTokenID++;
 
             newIDs[i] = _internalTokenID;
             newAmounts[i] = 1;
         }
         _tokenIds = _internalTokenID;
+        numberMinted[msg.sender] += _quantity;
 
-        _mintBatch(msg.sender, newIDs, newAmounts, "");
+        return (newIDs, newAmounts);
     }
 
     /// totalMinted returns the amount of minted Arcade Passes
@@ -218,5 +222,13 @@ contract ArcadePass1155 is ERC1155, Ownable, Pausable {
     {
         (bool success, ) = teamAddress.call{value: address(this).balance}('');
         require(success, 'Transfer failed.');
+    }
+
+    function _beforeTokenTransfer(address operator, address from, address to, uint256[] memory ids, uint256[] memory amounts, bytes memory data)
+        internal
+        whenNotPaused
+        override
+    {
+        super._beforeTokenTransfer(operator, from, to, ids, amounts, data);
     }
 }

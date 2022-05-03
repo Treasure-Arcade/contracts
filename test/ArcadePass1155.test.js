@@ -5,6 +5,8 @@ const { expect } = require('chai');
 const { ethers, waffle } = require('hardhat');
 const { BigNumber } = require('ethers');
 
+const START_TIME = 1649083667;
+const URI = 'http://test-uri.abc/';
 let mainContract;
 let price;
 let maxMintCount;
@@ -12,8 +14,6 @@ let owner;
 let team;
 let addr1;
 let addr2;
-
-const START_TIME = 1649083667;
 
 const createTestSuite = ({ contract, constructorArgs }) =>
   function () {
@@ -33,14 +33,20 @@ const createTestSuite = ({ contract, constructorArgs }) =>
       });
 
       context('Initial Contract', async function () {
-        it('has 0 totalSupply', async function () {
-          const supply = await mainContract.totalSupply();
-          expect(supply).to.equal(0);
+        it('has name and symbol set', async function () {
+          const name = await mainContract.name();
+          expect(name).to.equal('Arcade Pass');
+
+          const symbol = await mainContract.symbol();
+          expect(symbol).to.equal('ARCADE');
         });
 
-        it('has 0 totalMinted', async function () {
+        it('has minted genesis nft', async function () {
           const totalMinted = await mainContract.totalMinted();
-          expect(totalMinted).to.equal(0);
+          expect(totalMinted).to.equal(1);
+
+          const owner = await mainContract.owner();
+          expect(await mainContract.balanceOf(owner, 1)).to.equal(1);
         });
 
         it('owner can update mint start times', async function () {
@@ -52,6 +58,11 @@ const createTestSuite = ({ contract, constructorArgs }) =>
 
           const allowlistMintStartTime = await mainContract.allowlistMintStartTime();
           expect(allowlistMintStartTime).to.equal(START_TIME + 1000);
+        });
+
+        it('has uri set', async function () {
+          const uri = await mainContract.uri(1);
+          expect(uri).to.equal(URI);
         });
 
         it('can be paused and unpaused', async function () {
@@ -74,13 +85,14 @@ const createTestSuite = ({ contract, constructorArgs }) =>
 
       context('Team Mint Functionality', async function () {
         it('team can mint tokens', async function () {
-          const teamAllowance = await mainContract.TEAM_MINT_COUNT();
+          const initialSupply = BigNumber.from(await mainContract.totalMinted());
+          const teamAllowance = BigNumber.from(await mainContract.TEAM_MINT_COUNT());
 
           const teamWallet = mainContract.connect(team);
           await teamWallet.teamMint();
 
-          const teamBalance = await mainContract.balanceOf(team.address);
-          expect(teamBalance).to.be.equal(teamAllowance);
+          const currentSupply = BigNumber.from(await mainContract.totalMinted());
+          expect(currentSupply).to.be.equal(initialSupply.add(teamAllowance));
         });
 
         it('only the teamAddress can mint', async function () {
@@ -117,16 +129,14 @@ const createTestSuite = ({ contract, constructorArgs }) =>
         it('throws an exception if minted before publicMintStartTime', async function () {
           const startTime = Date.now() + 1000000;
           await mainContract.updatePublicMintStartTime(startTime);
-          await expect(mainContract.publicMint(1, { value: price.toString() })).to.be.revertedWith('Not Active');
+          await expect(mainContract.publicMint(1, { value: price })).to.be.revertedWith('Not Active');
         });
 
         it('can mint MAX_MINT_COUNT tokens', async function () {
           const user = mainContract.connect(addr1);
           const totalPrice = price * maxMintCount;
 
-          await user.publicMint(1, { value: totalPrice.toString() });
-          const balance = await user.balanceOf(addr1.address);
-          expect(+balance).to.be.equal(maxMintCount);
+          expect(user.publicMint(maxMintCount, { value: totalPrice.toString() })).to.be.ok;
         });
 
         it('throws an exception if underpaid', async function () {
@@ -176,10 +186,9 @@ const createTestSuite = ({ contract, constructorArgs }) =>
           const proof = this.merkleTree.getHexProof(keccak256(addr1.address));
           const user = mainContract.connect(addr1);
 
-          await user.allowlistMint(proof, 1, { value: price.toString() });
-          let balance = await user.balanceOf(addr1.address);
-          expect(+balance).to.be.equal(1);
+          const totalPrice = price * maxMintCount;
 
+          expect(user.allowlistMint(proof, maxMintCount, { value: totalPrice.toString() })).to.be.ok;
           await expect(user.allowlistMint(proof, 1, { value: price.toString() })).to.be.revertedWith(
             'Exceeds allowance'
           );
@@ -189,14 +198,15 @@ const createTestSuite = ({ contract, constructorArgs }) =>
   };
 
 describe(
-  'ArcadePass',
+  'ArcadePass1155',
   createTestSuite({
-    contract: 'ArcadePass',
+    contract: 'ArcadePass1155',
     constructorArgs: [
       '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266',
       '0x070e8db97b197cc0e4a1790c5e6c3667bab32d733db7f815fbe84f5824c7168d',
-      1651498961,
-      1651498961,
+      START_TIME,
+      START_TIME,
+      URI,
     ],
   })
 );

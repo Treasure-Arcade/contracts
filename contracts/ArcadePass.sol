@@ -40,7 +40,9 @@ contract ArcadePass is Ownable, ERC721A, Pausable {
      **********************/
 
     uint256 public constant MAX_MINT_COUNT = 1;
-    uint256 public constant TEAM_MINT_COUNT = 500;
+
+    /// should be divisible by 20
+    uint256 public constant TEAM_MINT_COUNT = 500; 
     uint256 public constant TOTAL_SUPPLY = 10_000;
     uint256 public constant ETH_PRICE = 0.05 ether;
     
@@ -71,8 +73,8 @@ contract ArcadePass is Ownable, ERC721A, Pausable {
     }
 
     /// Verify that address did not mint MAX_MINT_COUNT
-    modifier hasNotMintedMax() {
-        require(super._numberMinted(msg.sender) < MAX_MINT_COUNT, 'Not Eligible to Mint');
+    modifier hasNotMintedMax(uint256 _quantity) {
+        require((super._numberMinted(msg.sender) + _quantity) <= MAX_MINT_COUNT, 'Exceeds allowance');
         _;
     }
     
@@ -111,28 +113,28 @@ contract ArcadePass is Ownable, ERC721A, Pausable {
      * External and Public Functions *
      *********************************/
 
-    /// allowlistMint allows the sender to mint 1 Arcade Pass if allowlisted
-    function allowlistMint(bytes32[] calldata _merkleProof) external payable 
+    /// allowlistMint allows the sender to mint an Arcade Pass if allowlisted
+    function allowlistMint(bytes32[] calldata _merkleProof, uint256 _quantity) external payable 
         saleStarted(allowlistMintStartTime) 
         supplyAvailable
-        hasNotMintedMax
+        hasNotMintedMax(_quantity)
         correctPrice
     {
         /// Verify that address is on the allowlist
         bytes32 leaf = keccak256(abi.encodePacked(msg.sender));
         require(MerkleProof.verify(_merkleProof, merkleRoot, leaf), 'Invalid Proof');
 
-        super._mint(msg.sender, 1);
+        super._mint(msg.sender, _quantity);
     }
 
-    /// publicMint allows the sender to mint 1 Arcade Pass
-    function publicMint() external payable
+    /// publicMint allows the sender to mint an Arcade Pass
+    function publicMint(uint256 _quantity) external payable
         saleStarted(publicMintStartTime)
         supplyAvailable
-        hasNotMintedMax
+        hasNotMintedMax(_quantity)
         correctPrice
     {
-        super._mint(msg.sender, 1);
+        super._mint(msg.sender, _quantity);
     }
 
     /// teamMint allows the teamAddress to mint the TEAM_MINT_COUNT
@@ -145,9 +147,9 @@ contract ArcadePass is Ownable, ERC721A, Pausable {
 
         teamHasMinted = true;
 
-        /// Mint ArcadePass in batches of 10
-        for (uint256 i = 0; i < (TEAM_MINT_COUNT / 10); i++) {
-            super._mint(msg.sender, 10);
+        /// Mint ArcadePass in batches of 20
+        for (uint256 i = 0; i < (TEAM_MINT_COUNT / 20); i++) {
+            super._mint(msg.sender, 20);
         }
     }
 
@@ -233,5 +235,13 @@ contract ArcadePass is Ownable, ERC721A, Pausable {
     /// Toggles the usage of the default- or baseTokenURI
     function setToggleDefaultURI(bool enable) external onlyOwner {
         _enableDefaultUri = enable;
+    }
+
+    function _beforeTokenTransfers(address from, address to, uint256 startTokenId, uint256 quantity)
+        internal
+        whenNotPaused
+        override
+    {
+        super._beforeTokenTransfers(from, to, startTokenId, quantity);
     }
 }

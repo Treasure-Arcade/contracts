@@ -34,7 +34,8 @@
     "compile": "hardhat compile",
     "test": "yarn compile && mocha --bail --recursive test",
     "gas": "cross-env REPORT_GAS=true hardhat test",
-    "lint": "eslint --ignore-path .gitignore . --fix",
+    "lint": "yarn lint:eslint & yarn lint:prettier",
+    "lint:eslint": "eslint --ignore-path .gitignore . --fix",
     "lint:prettier": "yarn prettier --write .",
     "deploy:test": "hardhat run scripts/deploy.js --network rinkeby",
     "verify:etherscan": "hardhat verify --network rinkeby [ADDRESS]"
